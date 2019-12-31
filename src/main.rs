@@ -2,34 +2,25 @@
 
 #![deny(warnings)]
 
+use async_ctrlc::CtrlC;
+use async_std::prelude::FutureExt as _;
 use chrono::Local;
+use futures::{Stream, StreamExt};
+use futures::future::ready;
 use rgb::RGB8;
 use serde::{Serialize, Serializer};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn main() {
-    let get_proceed = Arc::new(AtomicBool::new(true));
-    let set_proceed = get_proceed.clone();
-    ctrlc::set_handler(move || set_proceed.store(false, Ordering::SeqCst)).unwrap();
-    let sources = [
-        render_time,
-    ];
+    let ctrlc = CtrlC::new().expect("Failed to register CTRL+C handler");
     println!(r#"{{ "version": 1 }}"#);
     println!("[");
-    while get_proceed.load(Ordering::SeqCst) {
-        let line = sources.iter().map(|f| f()).collect::<Vec<_>>();
-        let line = serde_json::to_string(&line).unwrap();
-        println!("{},", line);
-        thread::sleep(Duration::from_secs(1));
-    }
+    async_std::task::block_on(write_blocks().race(ctrlc));
     println!("[]");
     println!("]");
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 struct Block {
     full_text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,7 +61,70 @@ where
     serializer.serialize_str(&s)
 }
 
-fn render_time() -> Block {
-    let t = Local::now();
-    Block::new(t.format("%F %R").to_string())
+async fn write_blocks() {
+    let streams = vec![
+        render_battery().boxed(),
+        render_time().boxed(),
+    ];
+    let streams = streams.into_iter().enumerate()
+        .map(|(index, blocks)| blocks.map(move |block| (index, block)));
+    let mut blocks = vec![None; streams.len()];
+    let mut block_stream = futures::stream::select_all(streams);
+    let mut refresh_time = Instant::now();
+    let refresh_period = Duration::from_secs(1);
+    while let Some((index, block)) = block_stream.next().await {
+        blocks[index] = Some(block);
+        let t = Instant::now();
+        if t - refresh_time >= refresh_period {
+            refresh_time = t;
+            render_blocks(&blocks);
+        }
+    }
+}
+
+fn render_blocks(blocks: &[Option<Block>]) {
+    let blocks = blocks.iter().cloned().flatten().collect::<Vec<_>>();
+    let line = serde_json::to_string(&blocks).unwrap();
+    println!("{},", line);
+}
+
+fn render_time() -> impl Stream<Item = Block> {
+    async_std::stream::once(())
+        .chain(async_std::stream::interval(Duration::from_secs(1)))
+        .map(|_| {
+            let t = Local::now();
+            Block::new(t.format("%F %R").to_string())
+        })
+}
+
+fn render_battery() -> impl Stream<Item = Block> {
+    async_std::stream::once(())
+        .chain(async_std::stream::interval(Duration::from_secs(60)))
+        .filter_map(|_| ready(make_battery_block().ok()))
+}
+
+fn make_battery_block() -> Result<Block, battery::Error> {
+    let manager = battery::Manager::new()?;
+    let capacity = manager.batteries()?
+        .try_fold(0.0, |acc, battery| {
+            Ok::<_, battery::Error>(acc + battery?.state_of_charge().value)
+        })?;
+    let icon = battery_icon(capacity);
+    let capacity = capacity * 100.0;
+    let capacity = capacity.round() as u32;
+    Ok(Block::new(format!("{} {}%", icon, capacity)))
+}
+
+fn battery_icon(capacity: f32) -> char {
+    if capacity < 0.125 {
+        '\u{f244}'
+    } else if capacity < 0.375 {
+        '\u{f243}'
+    } else if capacity < 0.625 {
+        '\u{f242}'
+    } else if capacity < 0.875 {
+        '\u{f241}'
+    } else {
+        '\u{f240}'
+    }
 }
