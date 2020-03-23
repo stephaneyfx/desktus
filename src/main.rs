@@ -100,31 +100,42 @@ fn render_time() -> impl Stream<Item = Block> {
 fn render_battery() -> impl Stream<Item = Block> {
     async_std::stream::once(())
         .chain(async_std::stream::interval(Duration::from_secs(60)))
-        .filter_map(|_| ready(make_battery_block().ok()))
+        .filter_map(|_| ready(make_battery_block().ok().flatten()))
 }
 
-fn make_battery_block() -> Result<Block, battery::Error> {
+fn make_battery_block() -> Result<Option<Block>, battery::Error> {
     let manager = battery::Manager::new()?;
-    let capacity = manager.batteries()?
-        .try_fold(0.0, |acc, battery| {
-            Ok::<_, battery::Error>(acc + battery?.state_of_charge().value)
+    if manager.batteries()?.next().is_none() {
+        return Ok(None)
+    }
+    let (capacity, charging) = manager.batteries()?
+        .try_fold((0.0, false), |(capacity, charging), battery| {
+            let battery = battery?;
+            let capacity = capacity + battery.state_of_charge().value;
+            let battery_state = battery.state();
+            let charging = charging
+                || battery_state == battery::State::Charging;
+            Ok::<_, battery::Error>((capacity, charging))
         })?;
-    let icon = battery_icon(capacity);
+    let icon = battery_icon(capacity, charging);
     let capacity = capacity * 100.0;
     let capacity = capacity.round() as u32;
-    Ok(Block::new(format!("{} {}%", icon, capacity)))
+    Ok(Some(Block::new(format!("{} {}%", icon, capacity))))
 }
 
-fn battery_icon(capacity: f32) -> char {
-    if capacity < 0.125 {
-        '\u{f244}'
-    } else if capacity < 0.375 {
-        '\u{f243}'
-    } else if capacity < 0.625 {
-        '\u{f242}'
-    } else if capacity < 0.875 {
-        '\u{f241}'
-    } else {
-        '\u{f240}'
-    }
+fn battery_icon(capacity: f32, charging: bool) -> char {
+    const ICONS: &[[char; 2]] = &[
+        ['\u{f007a}', '\u{f089c}'],
+        ['\u{f007b}', '\u{f0086}'],
+        ['\u{f007c}', '\u{f0087}'],
+        ['\u{f007d}', '\u{f0088}'],
+        ['\u{f007e}', '\u{f089d}'],
+        ['\u{f007f}', '\u{f0089}'],
+        ['\u{f0080}', '\u{f089e}'],
+        ['\u{f0081}', '\u{f008a}'],
+        ['\u{f0082}', '\u{f008b}'],
+        ['\u{f0079}', '\u{f0085}'],
+    ];
+    let capacity = ((capacity * ICONS.len() as f32) as usize).min(ICONS.len() - 1);
+    ICONS[capacity][charging as usize]
 }

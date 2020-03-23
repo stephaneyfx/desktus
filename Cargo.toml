@@ -1,6 +1,6 @@
 [package]
 name = "desktus"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Stephane Raux <stephaneyfx@gmail.com>"]
 edition = "2018"
 description = "Desktop status bar client for i3bar"
