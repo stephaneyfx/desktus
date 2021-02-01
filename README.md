@@ -1,2 +1,2 @@
 # Purpose
-i3bar client
+i3bar and swaybar client
