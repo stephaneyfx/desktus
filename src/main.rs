@@ -233,7 +233,7 @@ fn memory_usage_block(mem_stats: heim::memory::Memory) -> Block {
     let available = bytes(mem_stats.available());
     let used = total - available;
     let (used, total) = (used as f64, total as f64);
-    let block = Block::new(format!("\u{f035b} {} / {}", pretty_bytes(used), pretty_bytes(total)));
+    let block = Block::new(format!("\u{f1296} {} / {}", pretty_bytes(used), pretty_bytes(total)));
     block.critical_if(used / total >= 0.95)
 }
 
