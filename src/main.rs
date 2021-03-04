@@ -80,6 +80,7 @@ where
 async fn write_blocks() {
     let streams = vec![
         render_nic_info().boxed(),
+        render_disk_io().boxed(),
         render_disk_usage().boxed(),
         render_memory_usage().boxed(),
         render_cpu_usage().boxed(),
@@ -126,9 +127,6 @@ fn render_battery() -> impl Stream<Item = Vec<Block>> {
 
 fn make_battery_block() -> Result<Option<Block>, battery::Error> {
     let manager = battery::Manager::new()?;
-    if manager.batteries()?.next().is_none() {
-        return Ok(None)
-    }
     let (battery_count, capacity, charging) = manager.batteries()?
         .try_fold((0, 0.0, false), |(battery_count, capacity, charging), battery| {
             let battery = battery?;
@@ -282,6 +280,26 @@ fn net_io_blocks(stats: NetIoStats, elapsed: Duration) -> Vec<Block> {
     ]
 }
 
+fn render_disk_io() -> impl Stream<Item = Vec<Block>> {
+    let blocks = DiskIoSnapshot::capture()
+        .map(|snapshot| futures::stream::unfold(snapshot, |old_snapshot| async move {
+            let new_snapshot = DiskIoSnapshot::capture().await;
+            let diff = new_snapshot.stats - old_snapshot.stats;
+            let elapsed = new_snapshot.time - old_snapshot.time;
+            Some((disk_io_blocks(diff, elapsed), new_snapshot))
+        }))
+        .flatten_stream()
+        .boxed();
+    throttle(Duration::from_secs(5), blocks)
+}
+
+fn disk_io_blocks(stats: IoStats, elapsed: Duration) -> Vec<Block> {
+    vec![
+        bytes_per_second_block("\u{f095e}", stats.bytes_read, elapsed),
+        bytes_per_second_block("\u{f095d}", stats.bytes_written, elapsed),
+    ]
+}
+
 fn bytes_per_second_block(icon: &str, byte_count: u64, elapsed: Duration) -> Block {
     let elapsed = elapsed.as_secs_f64();
     let count = byte_count as f64 / elapsed;
@@ -299,6 +317,13 @@ impl IoStats {
         Self {
             bytes_written: bytes(counters.bytes_sent()),
             bytes_read: bytes(counters.bytes_recv()),
+        }
+    }
+
+    fn from_disk(counters: &heim::disk::IoCounters) -> Self {
+        Self {
+            bytes_written: bytes(counters.write_bytes()),
+            bytes_read: bytes(counters.read_bytes()),
         }
     }
 }
@@ -385,6 +410,24 @@ impl NetIoSnapshot {
                 }
                 async move { acc }
             })
+            .map(|stats| Self { stats, time: Instant::now() })
+            .await
+    }
+}
+
+#[derive(Debug)]
+struct DiskIoSnapshot {
+    stats: IoStats,
+    time: Instant,
+}
+
+impl DiskIoSnapshot {
+    async fn capture() -> Self {
+        heim::disk::io_counters_physical()
+            .filter_map(|counters| async move {
+                Some(IoStats::from_disk(&counters.ok()?))
+            })
+            .fold(IoStats::default(), |acc, stats| ready(acc + stats))
             .map(|stats| Self { stats, time: Instant::now() })
             .await
     }
