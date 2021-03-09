@@ -29,7 +29,30 @@ async fn main() {
 }
 
 #[derive(Clone, Debug, Serialize)]
+enum BlockName {
+    Date,
+    Time,
+    Battery,
+    CpuUsage,
+    MemoryUsage,
+    DiskUsage,
+    DiskReadSpeed,
+    DiskWriteSpeed,
+    NetReadSpeed,
+    NetWriteSpeed,
+    LoReadSpeed,
+    LoWriteSpeed,
+}
+
+impl BlockName {
+    fn build<S: Into<String>>(self, text: S) -> Block {
+        Block::new(self, text)
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
 struct Block {
+    name: BlockName,
     full_text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     short_text: Option<String>,
@@ -47,9 +70,10 @@ struct Block {
 }
 
 impl Block {
-    fn new<S: Into<String>>(s: S) -> Block {
+    fn new<S: Into<String>>(name: BlockName, text: S) -> Block {
         Block {
-            full_text: s.into(),
+            name,
+            full_text: text.into(),
             short_text: None,
             color: None,
             background: None,
@@ -113,8 +137,8 @@ fn render_time() -> impl Stream<Item = Vec<Block>> {
     let blocks = || {
         let t = Local::now();
         vec![
-            Block::new(t.format("%a %d %b %Y").to_string()),
-            Block::new(t.format("%R").to_string()),
+            BlockName::Date.build(t.format("%a %d %b %Y").to_string()),
+            BlockName::Time.build(t.format("%R").to_string()),
         ]
     };
     throttle(Duration::from_secs(1), futures::stream::repeat_with(blocks))
@@ -142,7 +166,7 @@ fn make_battery_block() -> Result<Option<Block>, battery::Error> {
     let icon = battery_icon(capacity, charging);
     let capacity = capacity * 100.0;
     let capacity = capacity.round() as u32;
-    let block = Block::new(format!("{} {}%", icon, capacity));
+    let block = BlockName::Battery.build(format!("{} {}%", icon, capacity));
     Ok(Some(block.critical_if(capacity <= 10)))
 }
 
@@ -180,7 +204,7 @@ fn render_cpu_usage() -> impl Stream<Item = Vec<Block>> {
 }
 
 fn cpu_usage_block(usage: u32) -> Block {
-    let block = Block::new(format!("\u{f08d6} {}%", usage));
+    let block = BlockName::CpuUsage.build(format!("\u{f08d6} {}%", usage));
     block.critical_if(usage >= 95)
 }
 
@@ -231,7 +255,9 @@ fn memory_usage_block(mem_stats: heim::memory::Memory) -> Block {
     let available = bytes(mem_stats.available());
     let used = total - available;
     let (used, total) = (used as f64, total as f64);
-    let block = Block::new(format!("\u{f1296} {} / {}", pretty_bytes(used), pretty_bytes(total)));
+    let block = BlockName::MemoryUsage.build(
+        format!("\u{f1296} {} / {}", pretty_bytes(used), pretty_bytes(total)),
+    );
     block.critical_if(used / total >= 0.95)
 }
 
@@ -254,7 +280,8 @@ fn render_disk_usage() -> impl Stream<Item = Vec<Block>> {
 }
 
 fn disk_usage_block(used: f64, total: f64) -> Block {
-    Block::new(format!("\u{f01bc} {} / {}", pretty_bytes(used), pretty_bytes(total)))
+    BlockName::DiskUsage
+        .build(format!("\u{f01bc} {} / {}", pretty_bytes(used), pretty_bytes(total)))
         .critical_if(used / total >= 0.9)
 }
 
@@ -273,10 +300,18 @@ fn render_nic_info() -> impl Stream<Item = Vec<Block>> {
 
 fn net_io_blocks(stats: NetIoStats, elapsed: Duration) -> Vec<Block> {
     vec![
-        bytes_per_second_block("\u{f01da}", stats.external.bytes_read, elapsed),
-        bytes_per_second_block("\u{f0552}", stats.external.bytes_written, elapsed),
-        bytes_per_second_block("\u{f1320}", stats.loopback.bytes_read, elapsed),
-        bytes_per_second_block("\u{f1373}", stats.loopback.bytes_written, elapsed),
+        bytes_per_second_block(
+            BlockName::NetReadSpeed, "\u{f01da}", stats.external.bytes_read, elapsed,
+        ),
+        bytes_per_second_block(
+            BlockName::NetWriteSpeed, "\u{f0552}", stats.external.bytes_written, elapsed,
+        ),
+        bytes_per_second_block(
+            BlockName::LoReadSpeed, "\u{f1320}", stats.loopback.bytes_read, elapsed,
+        ),
+        bytes_per_second_block(
+            BlockName::LoWriteSpeed, "\u{f1373}", stats.loopback.bytes_written, elapsed,
+        ),
     ]
 }
 
@@ -295,15 +330,22 @@ fn render_disk_io() -> impl Stream<Item = Vec<Block>> {
 
 fn disk_io_blocks(stats: IoStats, elapsed: Duration) -> Vec<Block> {
     vec![
-        bytes_per_second_block("\u{f095e}", stats.bytes_read, elapsed),
-        bytes_per_second_block("\u{f095d}", stats.bytes_written, elapsed),
+        bytes_per_second_block(BlockName::DiskReadSpeed, "\u{f095e}", stats.bytes_read, elapsed),
+        bytes_per_second_block(
+            BlockName::DiskWriteSpeed, "\u{f095d}", stats.bytes_written, elapsed,
+        ),
     ]
 }
 
-fn bytes_per_second_block(icon: &str, byte_count: u64, elapsed: Duration) -> Block {
+fn bytes_per_second_block(
+    name: BlockName,
+    icon: &str,
+    byte_count: u64,
+    elapsed: Duration,
+) -> Block {
     let elapsed = elapsed.as_secs_f64();
     let count = byte_count as f64 / elapsed;
-    Block::new(format!("{} {}/s", icon, pretty_bytes(count)))
+    Block::new(name, format!("{} {}/s", icon, pretty_bytes(count)))
 }
 
 #[derive(Clone, Copy, Debug, Default)]
