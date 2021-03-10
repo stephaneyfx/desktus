@@ -2,6 +2,7 @@
 
 #![deny(warnings)]
 
+use brightness::{brightness_devices, Brightness};
 use chrono::Local;
 use futures::{
     future::ready,
@@ -42,6 +43,7 @@ enum BlockName {
     NetWriteSpeed,
     LoReadSpeed,
     LoWriteSpeed,
+    Brightness,
 }
 
 impl BlockName {
@@ -53,6 +55,8 @@ impl BlockName {
 #[derive(Clone, Debug, Serialize)]
 struct Block {
     name: BlockName,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    instance: Option<String>,
     full_text: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     short_text: Option<String>,
@@ -73,6 +77,7 @@ impl Block {
     fn new<S: Into<String>>(name: BlockName, text: S) -> Block {
         Block {
             name,
+            instance: None,
             full_text: text.into(),
             short_text: None,
             color: None,
@@ -90,6 +95,13 @@ impl Block {
     fn critical_if(self, yes: bool) -> Block {
         if yes { self.critical() } else { self }
     }
+
+    fn with_instance<S: Into<String>>(self, instance: S) -> Self {
+        Self {
+            instance: Some(instance.into()),
+            ..self
+        }
+    }
 }
 
 fn serialize_color<S>(color: &Option<Srgb<u8>>, serializer: S) -> Result<S::Ok, S::Error>
@@ -103,6 +115,7 @@ where
 
 async fn write_blocks() {
     let streams = vec![
+        render_brightness().boxed(),
         render_nic_info().boxed(),
         render_disk_io().boxed(),
         render_disk_usage().boxed(),
@@ -346,6 +359,25 @@ fn bytes_per_second_block(
     let elapsed = elapsed.as_secs_f64();
     let count = byte_count as f64 / elapsed;
     Block::new(name, format!("{} {}/s", icon, pretty_bytes(count)))
+}
+
+fn render_brightness() -> impl Stream<Item = Vec<Block>> {
+    let blocks = futures::stream::repeat(())
+        .then(|_| {
+            brightness_devices()
+                .filter_map(|device| async move {
+                    let device = device.ok()?;
+                    let name = device.device_name().await;
+                    let level = device.get().await.ok()?;
+                    Some(brightness_block(&name, level))
+                })
+                .collect()
+        });
+    throttle(Duration::from_secs(5), blocks.boxed())
+}
+
+fn brightness_block(device: &str, value: u32) -> Block {
+    BlockName::Brightness.build(format!("\u{f0379} {}%", value)).with_instance(device)
 }
 
 #[derive(Clone, Copy, Debug, Default)]
