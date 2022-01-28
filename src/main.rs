@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Stephane Raux. Distributed under the zlib license.
+// Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
 
 #![deny(warnings)]
 
