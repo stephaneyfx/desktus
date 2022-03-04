@@ -8,27 +8,22 @@ use tokio_stream::wrappers::LinesStream;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Event<M> {
     pub message: M,
-    pub button: Button,
-    pub modifiers: Vec<ButtonModifier>,
+    pub button: MouseButton,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum Button {
-    MouseLeft,
-    MouseMiddle,
-    MouseRight,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum ButtonModifier {
-    Shift,
+pub enum MouseButton {
+    Left,
+    Middle,
+    Right,
+    Down,
+    Up,
 }
 
 #[derive(Debug, Deserialize)]
 struct WireEvent {
     name: String,
     button: u32,
-    modifiers: Vec<String>,
 }
 
 impl<M: DeserializeOwned> TryFrom<WireEvent> for Event<M> {
@@ -41,27 +36,17 @@ impl<M: DeserializeOwned> TryFrom<WireEvent> for Event<M> {
         Ok(Self {
             message,
             button: parse_button(e.button).ok_or(())?,
-            modifiers: e
-                .modifiers
-                .into_iter()
-                .filter_map(|s| parse_modifier(&s))
-                .collect(),
         })
     }
 }
 
-fn parse_modifier(s: &str) -> Option<ButtonModifier> {
-    match s {
-        "Shift" => Some(ButtonModifier::Shift),
-        _ => None,
-    }
-}
-
-fn parse_button(n: u32) -> Option<Button> {
+fn parse_button(n: u32) -> Option<MouseButton> {
     match n {
-        1 => Some(Button::MouseLeft),
-        2 => Some(Button::MouseMiddle),
-        3 => Some(Button::MouseRight),
+        1 => Some(MouseButton::Left),
+        2 => Some(MouseButton::Middle),
+        3 => Some(MouseButton::Right),
+        4 => Some(MouseButton::Down),
+        5 => Some(MouseButton::Up),
         _ => None,
     }
 }
@@ -69,7 +54,9 @@ fn parse_button(n: u32) -> Option<Button> {
 pub fn events<M: DeserializeOwned>() -> impl Stream<Item = Event<M>> {
     LinesStream::new(tokio::io::BufReader::new(tokio::io::stdin()).lines()).filter_map(
         |line| async move {
-            serde_json::from_str::<WireEvent>(&line.ok()?)
+            let line = line.ok()?;
+            let line = line.trim_matches(&[','][..]);
+            serde_json::from_str::<WireEvent>(&line)
                 .ok()?
                 .try_into()
                 .ok()

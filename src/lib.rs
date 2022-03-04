@@ -4,7 +4,7 @@
 // #![deny(warnings)]
 
 pub use block::Block;
-pub use event::{events, Event};
+pub use event::{events, Event, MouseButton};
 pub use serialize::serialize_blocks;
 pub use util::{throttle, ticks};
 

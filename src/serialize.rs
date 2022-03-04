@@ -60,18 +60,18 @@ impl Serialize for Color {
     }
 }
 
-pub async fn serialize_blocks<S, M>(blocks: S)
+pub async fn serialize_blocks<S, M>(blocks: S, enable_events: bool)
 where
     S: Stream<Item = Vec<Block<M>>>,
     M: Serialize,
 {
-    println!(r#"{{ "version": 1 }}"#);
+    println!(r#"{{ "version": 1, "click_events": {} }}"#, enable_events);
     println!("[");
     let blocks = throttle(Duration::from_secs(1), blocks);
     blocks
         .for_each(|blocks| async move {
             let blocks = blocks.into_iter().map(WireBlock::from).collect::<Vec<_>>();
-            println!("{}", serde_json::to_string(&blocks).unwrap());
+            println!("{},", serde_json::to_string(&blocks).unwrap());
         })
         .await;
     println!("[]");
