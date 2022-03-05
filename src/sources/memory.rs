@@ -9,8 +9,7 @@ pub struct MemoryUsage {
     pub total: u64,
 }
 
-pub fn memory_usage() -> MemoryUsage {
-    let mut system = System::new();
+pub fn memory_usage(system: &mut System) -> MemoryUsage {
     system.refresh_memory();
     MemoryUsage {
         used: system.used_memory() * 1000,

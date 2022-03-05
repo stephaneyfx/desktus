@@ -9,6 +9,7 @@ use futures::{pin_mut, StreamExt};
 use futuristic::StreamTools;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use sysinfo::{System, SystemExt};
 use tokio_stream::wrappers::WatchStream;
 
 #[tokio::main]
@@ -27,22 +28,35 @@ async fn main() {
             .flatten()
             .map(|b| desktus::views::BatteryView::new(b, Message::Ignore, foreground).render())
     });
-    let cpu = ticks(Duration::from_secs(5)).map(|_| {
-        desktus::views::CpuView::new(desktus::sources::cpu_usage(), Message::Ignore, foreground)
+    let cpu = ticks(Duration::from_secs(5)).map({
+        let mut system = System::new();
+        move |_| {
+            desktus::views::CpuView::new(
+                desktus::sources::cpu_usage(&mut system),
+                Message::Ignore,
+                foreground,
+            )
             .render()
+        }
     });
-    let memory = ticks(Duration::from_secs(5)).map(|_| {
-        desktus::views::MemoryView::new(
-            desktus::sources::memory_usage(),
-            Message::Ignore,
-            foreground,
-        )
-        .render()
+    let memory = ticks(Duration::from_secs(5)).map({
+        let mut system = System::new();
+        move |_| {
+            desktus::views::MemoryView::new(
+                desktus::sources::memory_usage(&mut system),
+                Message::Ignore,
+                foreground,
+            )
+            .render()
+        }
     });
-    let disk = ticks(Duration::from_secs(20)).map(|_| {
-        desktus::sources::disk_usage("/")
-            .ok()
-            .map(|d| desktus::views::DiskView::new(d, Message::Ignore, foreground).render())
+    let disk = ticks(Duration::from_secs(20)).map({
+        let mut system = System::new();
+        move |_| {
+            desktus::sources::disk_usage(&mut system, "/")
+                .ok()
+                .map(|d| desktus::views::DiskView::new(d, Message::Ignore, foreground).render())
+        }
     });
     let (brightness_notif_sender, brightness_notif_receiver) = tokio::sync::watch::channel(());
     let brightness_notif_sender = &brightness_notif_sender;

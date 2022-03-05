@@ -2,8 +2,7 @@
 
 use sysinfo::{ProcessorExt, System, SystemExt};
 
-pub fn cpu_usage() -> u32 {
-    let mut system = System::new();
+pub fn cpu_usage(system: &mut System) -> u32 {
     system.refresh_cpu();
     let usage = system.global_processor_info().cpu_usage();
     100.min(usage.round() as u32)

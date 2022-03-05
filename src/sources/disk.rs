@@ -10,12 +10,11 @@ pub struct DiskUsage {
     pub total: u64,
 }
 
-pub fn disk_usage<P>(mount_point: P) -> Result<DiskUsage, io::Error>
+pub fn disk_usage<P>(system: &mut System, mount_point: P) -> Result<DiskUsage, io::Error>
 where
     P: AsRef<Path>,
 {
     let mount_point = mount_point.as_ref();
-    let mut system = System::new();
     system.refresh_disks_list();
     system.refresh_disks();
     system
