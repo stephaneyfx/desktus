@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
 
 // #![deny(missing_docs)]
-// #![deny(warnings)]
+#![deny(warnings)]
 
 pub use block::Block;
 pub use event::{events, Event, MouseButton};
