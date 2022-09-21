@@ -12,7 +12,7 @@ pub struct MemoryUsage {
 pub fn memory_usage(system: &mut System) -> MemoryUsage {
     system.refresh_memory();
     MemoryUsage {
-        used: system.used_memory() * 1000,
-        total: system.total_memory() * 1000,
+        used: system.used_memory(),
+        total: system.total_memory(),
     }
 }
