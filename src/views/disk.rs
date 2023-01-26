@@ -46,7 +46,7 @@ impl<M: Clone> DiskView<M> {
         Block {
             background: critical.then(|| self.critical_background),
             ..Block::new(
-                format!("\u{f024b} {available}"),
+                format!("\u{f0256} {available}"),
                 self.foreground,
                 self.message.clone(),
             )
