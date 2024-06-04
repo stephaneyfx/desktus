@@ -36,7 +36,7 @@ impl<M: Serialize> From<Block<M>> for WireBlock {
             border: b.border.map(Into::into),
             urgent: false,
             separator: false,
-            separator_block_width: 10,
+            separator_block_width: 15,
         }
     }
 }
