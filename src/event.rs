@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2024 Stephane Raux. Distributed under the 0BSD license.
 
 use futures::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2019-2024 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{util::throttle, Block};
 use futures::{Stream, StreamExt};
@@ -21,6 +21,7 @@ struct WireBlock {
     border: Option<Color>,
     urgent: bool,
     separator: bool,
+    separator_block_width: u32,
 }
 
 impl<M: Serialize> From<Block<M>> for WireBlock {
@@ -35,6 +36,7 @@ impl<M: Serialize> From<Block<M>> for WireBlock {
             border: b.border.map(Into::into),
             urgent: false,
             separator: false,
+            separator_block_width: 10,
         }
     }
 }

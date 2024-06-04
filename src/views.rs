@@ -1,6 +1,7 @@
-// Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2019-2024 Stephane Raux. Distributed under the 0BSD license.
 
-pub use self::{battery::BatteryView, brightness::BrightnessView};
+pub use battery::BatteryView;
+pub use brightness::BrightnessView;
 pub use cpu::CpuView;
 pub use date::DateView;
 pub use disk::DiskView;

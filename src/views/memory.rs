@@ -1,6 +1,6 @@
-// Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2019-2024 Stephane Raux. Distributed under the 0BSD license.
 
-use crate::{pretty::Quantity, sources::MemoryUsage, Block};
+use crate::{pretty::Quantity, sources::MemoryUsage, util::pie_chart, Block};
 use palette::Srgb;
 
 #[derive(Debug)]
@@ -42,11 +42,12 @@ impl<M: Clone> MemoryView<M> {
     pub fn render(&self) -> Block<M> {
         let available = self.usage.total - self.usage.used;
         let critical = available < self.critical_availability;
-        let available = Quantity::new(available as f64, "B");
+        let used = Quantity::new(self.usage.used as f64, "B");
+        let pie = pie_chart((self.usage.used * 100 / self.usage.total) as u32);
         Block {
             background: critical.then(|| self.critical_background),
             ..Block::new(
-                format!("\u{f035b} {available}"),
+                format!("\u{f035b} {used} {pie}"),
                 self.foreground,
                 self.message.clone(),
             )

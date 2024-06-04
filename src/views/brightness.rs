@@ -1,4 +1,4 @@
-// Copyright (C) 2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2024 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::{sources::BrightnessInfo, Block};
 use palette::Srgb;
@@ -28,7 +28,7 @@ where
     pub fn render(&self) -> Block<M> {
         let level = self.info.level;
         Block::new(
-            format!("\u{f0379} {level}%"),
+            format!("\u{f00e0} {level}%"),
             self.foreground,
             (self.make_message)(&self.info.device),
         )

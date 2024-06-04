@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Stephane Raux. Distributed under the 0BSD license.
+// Copyright (C) 2019-2024 Stephane Raux. Distributed under the 0BSD license.
 
 use crate::Block;
 use palette::Srgb;
