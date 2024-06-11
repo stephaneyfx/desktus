@@ -47,7 +47,7 @@ impl<M: Clone> MemoryView<M> {
         Block {
             background: critical.then(|| self.critical_background),
             ..Block::new(
-                format!("\u{f035b} {used} {pie}"),
+                format!("\u{f1296} {used} {pie}"),
                 self.foreground,
                 self.message.clone(),
             )
