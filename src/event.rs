@@ -45,8 +45,8 @@ fn parse_button(n: u32) -> Option<MouseButton> {
         1 => Some(MouseButton::Left),
         2 => Some(MouseButton::Middle),
         3 => Some(MouseButton::Right),
-        4 => Some(MouseButton::Down),
-        5 => Some(MouseButton::Up),
+        4 => Some(MouseButton::Up),
+        5 => Some(MouseButton::Down),
         _ => None,
     }
 }
